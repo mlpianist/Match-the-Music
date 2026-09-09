@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Match the Music</title>
+<title>Staff Placement</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/vexflow@4.2.3/build/cjs/vexflow.js"></script>
 <style>
@@ -39,10 +39,9 @@
   .subtitle{ color: var(--ivory-dim); font-size: 0.98rem; margin-top: 8px; line-height:1.5; }
 
   /* ---------- Home ---------- */
-  #screen-home{ padding: 32px 24px 40px; max-width: 620px; margin: 0 auto; width:100%; }
+  #screen-home{ padding: 32px 24px 40px; max-width: 680px; margin: 0 auto; width:100%; }
   .home-header{ margin-bottom: 26px; }
-  .level-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  @media (max-width:560px){ .level-grid{ grid-template-columns: 1fr; } }
+  .level-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
   .level-card{
     background: var(--panel);
     border: 1px solid var(--panel-line);
@@ -53,6 +52,7 @@
     transition: border-color .2s ease, transform .15s ease, background .2s ease;
   }
   .level-card:hover{ border-color: var(--brass-dim); background:#382C24; transform: translateY(-2px); }
+  .level-card.practice-card{ border-color: var(--brass-dim); }
   .level-card .level-name{ font-family:'Fraunces', serif; font-weight:600; font-size:1.3rem; color: var(--brass); }
   .level-card .level-sub{ font-size:0.82rem; color: var(--ivory-dim); text-align:center; }
 
@@ -76,10 +76,11 @@
     padding: 8px 16px 16px;
     border-radius:16px;
     transition: background-color .15s ease;
+    min-height: 0;
   }
   .game-panels.flash-good{ background: var(--good); }
   .game-panels.flash-bad{ background: var(--bad); }
-  @media (max-width:700px){ .game-panels{ flex-direction:column; } }
+  @media (max-width:760px){ .game-panels{ flex-direction:column; } }
 
   .panel{
     flex:1;
@@ -87,8 +88,8 @@
     border: 1px solid var(--panel-line);
     border-radius: 12px;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding: 16px;
-    gap: 14px;
+    padding: 14px;
+    gap: 12px;
     min-height: 0;
     transition: opacity .18s ease;
   }
@@ -96,15 +97,15 @@
 
   .panel-label{ font-size:0.76rem; color: var(--ivory-dim); text-transform:uppercase; letter-spacing:0.06em; }
 
-  .staff-box{ width:100%; flex:1; min-height:120px; display:flex; align-items:center; justify-content:center; }
-  .staff-box svg{ max-width:100%; height:auto; display:block; overflow: visible; }
+  .staff-box{ width:100%; flex:1; min-height:170px; display:flex; align-items:center; justify-content:center; }
+  .staff-box svg{ max-width:100%; max-height:100%; height:auto; display:block; overflow: visible; }
 
   #answer-staff-wrap{ cursor: crosshair; touch-action: none; }
 
-  .clef-buttons{ display:flex; gap:10px; }
+  .clef-buttons{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
   .clef-btn{
-    font-family:'Inter', sans-serif; font-weight:600; font-size:0.92rem;
-    padding: 10px 18px; border-radius: 8px; cursor:pointer;
+    font-family:'Inter', sans-serif; font-weight:600; font-size:0.86rem;
+    padding: 9px 14px; border-radius: 8px; cursor:pointer;
     background: var(--ink-soft); color: var(--ivory); border: 1px solid var(--panel-line);
     transition: background .15s ease, color .15s ease, border-color .15s ease;
   }
@@ -134,8 +135,8 @@
   <!-- HOME -->
   <section id="screen-home" class="screen active">
     <div class="home-header">
-      <h1>Match the Music</h1>
-      <p class="subtitle">A clef and note flash briefly. Pick the clef, then place the matching note on the empty staff.</p>
+      <h1>Staff Placement</h1>
+      <p class="subtitle">A clef, note value, and note flash briefly. Rebuild it on the empty staff: pick the clef, pick the note value, then place the pitch.</p>
     </div>
     <div class="level-grid" id="level-grid"></div>
   </section>
@@ -191,9 +192,23 @@
   var TREBLE_NOTES = ['E4','F4','G4','A4','B4','C5','D5','E5','F5'];
   var BASS_NOTES   = ['G2','A2','B2','C3','D3','E3','F3','G3','A3'];
 
+  var DURATIONS = [
+    { code: 'w',  vf: 'w', dotted: false, label: 'Whole' },
+    { code: 'h',  vf: 'h', dotted: false, label: 'Half' },
+    { code: 'hd', vf: 'h', dotted: true,  label: 'Dotted half' },
+    { code: 'q',  vf: 'q', dotted: false, label: 'Quarter' },
+    { code: '8',  vf: '8', dotted: false, label: 'Eighth' },
+    { code: '16', vf: '16', dotted: false, label: 'Sixteenth' }
+  ];
+
   var ONSCREEN_TIME = { 1: 1000, 2: 750, 3: 500 };
 
-  var STAFF_CFG = { width: 300, height: 150, staveX: 10, staveY: 35, staveWidth: 260, spacing: 10 };
+  // Logical drawing coordinates (fed to VexFlow); the whole scene is then
+  // upscaled via context.scale() so glyphs render larger, not just the box.
+  var STAFF_CFG = { width: 340, height: 170, staveX: 14, staveY: 40, staveWidth: 300, spacing: 10 };
+  var STAFF_SCALE = 1.45;
+  var SVG_WIDTH = STAFF_CFG.width * STAFF_SCALE;
+  var SVG_HEIGHT = STAFF_CFG.height * STAFF_SCALE;
 
   function randInt(max){ return Math.floor(Math.random() * max); }
 
@@ -204,7 +219,8 @@
   function pickRandomPrompt(){
     var clef = Math.random() < 0.5 ? 'treble' : 'bass';
     var idx = randInt(9);
-    return { clef: clef, note: slotNoteFor(clef, idx) };
+    var duration = DURATIONS[randInt(DURATIONS.length)];
+    return { clef: clef, note: slotNoteFor(clef, idx), duration: duration };
   }
 
   function toVexKey(noteName){
@@ -236,11 +252,12 @@
   }
 
   // ================= Staff rendering =================
-  function renderStaffGeneric(container, clef, noteName, isGhost){
+  function renderStaffGeneric(container, clef, noteName, durationObj, isGhost){
     container.innerHTML = '';
     var renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
-    renderer.resize(STAFF_CFG.width, STAFF_CFG.height);
+    renderer.resize(SVG_WIDTH, SVG_HEIGHT);
     var context = renderer.getContext();
+    context.scale(STAFF_SCALE, STAFF_SCALE);
     context.setFillStyle('#C9BFAF');
     context.setStrokeStyle('#C9BFAF');
 
@@ -248,16 +265,17 @@
     if(clef){ stave.addClef(clef); }
     stave.setContext(context).draw();
 
-    if(clef && noteName){
-      var note = new VF.StaveNote({ clef: clef, keys: [toVexKey(noteName)], duration: 'q' });
+    if(clef && noteName && durationObj){
+      var note = new VF.StaveNote({ clef: clef, keys: [toVexKey(noteName)], duration: durationObj.vf });
       var color = isGhost ? 'rgba(201,162,39,0.45)' : '#C9A227';
       note.setStyle({ fillStyle: color, strokeStyle: color });
+      if(durationObj.dotted){ VF.Dot.buildAndAttach([note], { all: true }); }
       VF.Formatter.FormatAndDraw(context, stave, [note]);
     }
   }
 
-  function renderPromptStaff(clef, note){
-    renderStaffGeneric(document.getElementById('prompt-staff'), clef, note, false);
+  function renderPromptStaff(clef, note, durationObj){
+    renderStaffGeneric(document.getElementById('prompt-staff'), clef, note, durationObj, false);
   }
   function clearPromptStaffDisplay(){
     document.getElementById('prompt-staff').innerHTML = '';
@@ -265,7 +283,9 @@
   function renderAnswerStaff(){
     var noteName = (state.answerSlotIndex !== null && state.answerClef)
       ? slotNoteFor(state.answerClef, state.answerSlotIndex) : null;
-    renderStaffGeneric(document.getElementById('answer-staff'), state.answerClef, noteName, !state.locked);
+    // Note duration is always auto-matched to the prompt's duration -- the
+    // player only chooses the clef and the pitch location.
+    renderStaffGeneric(document.getElementById('answer-staff'), state.answerClef, noteName, state.promptDuration, !state.locked);
   }
   function clearAnswerStaffDisplay(){
     document.getElementById('answer-staff').innerHTML = '';
@@ -273,6 +293,7 @@
 
   // ================= Home screen =================
   var LEVEL_DEFS = [
+    { level: 'practice', label: 'Practice', sub: 'Staff stays visible', practice: true },
     { level: 1, label: 'Level 1', sub: '1.0 second flash' },
     { level: 2, label: 'Level 2', sub: '0.75 second flash' },
     { level: 3, label: 'Level 3', sub: '0.5 second flash' }
@@ -283,7 +304,7 @@
     grid.innerHTML = '';
     LEVEL_DEFS.forEach(function(def){
       var card = document.createElement('div');
-      card.className = 'level-card';
+      card.className = 'level-card' + (def.practice ? ' practice-card' : '');
       var name = document.createElement('div');
       name.className = 'level-name';
       name.textContent = def.label;
@@ -303,6 +324,7 @@
     score: 0,
     promptClef: null,
     promptNote: null,
+    promptDuration: null,
     answerClef: null,
     answerSlotIndex: null,
     locked: false,
@@ -339,7 +361,6 @@
     document.getElementById('btn-clef-treble').classList.toggle('active', state.answerClef === 'treble');
     document.getElementById('btn-clef-bass').classList.toggle('active', state.answerClef === 'bass');
   }
-
   function selectClef(clef){
     if(state.locked || state.reviewing) return;
     state.answerClef = clef;
@@ -358,29 +379,40 @@
     startRound();
   }
 
-  function startRound(){
-    clearTimeout(state.promptTimer);
+  function resetAnswerState(){
     state.locked = false;
     state.reviewing = false;
     state.answerClef = null;
     state.answerSlotIndex = null;
     updateClefButtonStyles();
+  }
 
-    hideAnswerPanel();
-    clearAnswerStaffDisplay();
+  function startRound(){
+    clearTimeout(state.promptTimer);
+    resetAnswerState();
+
     showPromptPanel();
-
     var p = pickRandomPrompt();
     state.promptClef = p.clef;
     state.promptNote = p.note;
-    renderPromptStaff(p.clef, p.note);
+    state.promptDuration = p.duration;
+    renderPromptStaff(p.clef, p.note, p.duration);
 
-    state.promptTimer = setTimeout(function(){
-      hidePromptPanel();
-      clearPromptStaffDisplay();
+    if(state.level === 'practice'){
+      // Practice: both panels stay visible together, no timer, no hiding.
+      clearAnswerStaffDisplay();
       showAnswerPanel();
       renderAnswerStaff();
-    }, ONSCREEN_TIME[state.level]);
+    } else {
+      hideAnswerPanel();
+      clearAnswerStaffDisplay();
+      state.promptTimer = setTimeout(function(){
+        hidePromptPanel();
+        clearPromptStaffDisplay();
+        showAnswerPanel();
+        renderAnswerStaff();
+      }, ONSCREEN_TIME[state.level]);
+    }
   }
 
   function handleCorrect(){
@@ -402,7 +434,7 @@
     playSfx('wrong');
     state.reviewing = true;
     showPromptPanel();
-    renderPromptStaff(state.promptClef, state.promptNote);
+    renderPromptStaff(state.promptClef, state.promptNote, state.promptDuration);
     showNextButton();
   }
 
@@ -410,8 +442,10 @@
     if(!state.reviewing) return;
     clearPanelFlash();
     hideNextButton();
-    hidePromptPanel();
-    clearPromptStaffDisplay();
+    if(state.level !== 'practice'){
+      hidePromptPanel();
+      clearPromptStaffDisplay();
+    }
     state.reviewing = false;
     startRound();
   }
@@ -429,7 +463,9 @@
   function endInSuccess(){
     clearTimeout(state.promptTimer);
     var detail = document.getElementById('success-detail');
-    detail.textContent = 'You reached 10 points on level ' + state.level + '.';
+    detail.textContent = (state.level === 'practice')
+      ? 'You reached 10 points in Practice mode.'
+      : 'You reached 10 points on level ' + state.level + '.';
     var now = new Date();
     document.getElementById('success-timestamp').textContent =
       now.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' }) +
@@ -447,14 +483,14 @@
     if(evt.touches && evt.touches.length){ clientY = evt.touches[0].clientY; }
     else if(evt.changedTouches && evt.changedTouches.length){ clientY = evt.changedTouches[0].clientY; }
     else { clientY = evt.clientY; }
-    var scale = rect.width / STAFF_CFG.width;
+    var scale = rect.width / SVG_WIDTH;
     return (clientY - rect.top) / scale;
   }
 
   function nearestSlotIndex(localY){
     var best = 0, bestDist = Infinity;
     SLOT_LINES.forEach(function(line, idx){
-      var y = STAFF_CFG.staveY + line * STAFF_CFG.spacing;
+      var y = (STAFF_CFG.staveY + line * STAFF_CFG.spacing) * STAFF_SCALE;
       var dist = Math.abs(localY - y);
       if(dist < bestDist){ bestDist = dist; best = idx; }
     });
