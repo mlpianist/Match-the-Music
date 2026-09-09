@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match the Music</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/vexflow@4.2.3/build/cjs/vexflow.js"></script>
+<style>
+  :root{
+    --ink: #1C1512;
+    --ink-soft: #2A211C;
+    --panel: #2F2620;
+    --panel-line: #4A3B30;
+    --ivory: #FBF7EE;
+    --ivory-dim: #C9BFAF;
+    --brass: #C9A227;
+    --brass-dim: #8A7220;
+    --ebony: #14100D;
+    --good: #4C8C3B;
+    --bad: #B04A3C;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{
+    font-family:'Inter', sans-serif;
+    background: var(--ink);
+    background-image:
+      radial-gradient(ellipse at 15% 0%, rgba(201,162,39,0.07), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(201,162,39,0.05), transparent 50%);
+    color: var(--ivory);
+    min-height:100vh;
+  }
+  #app{ width:100%; min-height:100vh; display:flex; flex-direction:column; }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.active{ display:flex; animation: rise .4s cubic-bezier(.2,.7,.3,1); }
+  @keyframes rise{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:none; } }
+
+  h1{ font-family:'Fraunces', serif; font-weight:600; font-size: 2.1rem; letter-spacing:-0.01em; }
+  .subtitle{ color: var(--ivory-dim); font-size: 0.98rem; margin-top: 8px; line-height:1.5; }
+
+  /* ---------- Home ---------- */
+  #screen-home{ padding: 32px 24px 40px; max-width: 620px; margin: 0 auto; width:100%; }
+  .home-header{ margin-bottom: 26px; }
+  .level-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width:560px){ .level-grid{ grid-template-columns: 1fr; } }
+  .level-card{
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    padding: 22px 14px;
+    cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition: border-color .2s ease, transform .15s ease, background .2s ease;
+  }
+  .level-card:hover{ border-color: var(--brass-dim); background:#382C24; transform: translateY(-2px); }
+  .level-card .level-name{ font-family:'Fraunces', serif; font-weight:600; font-size:1.3rem; color: var(--brass); }
+  .level-card .level-sub{ font-size:0.82rem; color: var(--ivory-dim); text-align:center; }
+
+  /* ---------- Game screen ---------- */
+  #screen-game{ height:100vh; }
+  .game-topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 16px 20px 8px;
+  }
+  .text-btn{ background:none; border:none; color: var(--ivory-dim); font-family:'Inter', sans-serif; font-size:0.9rem; cursor:pointer; padding:6px 0; }
+  .text-btn:hover{ color: var(--ivory); }
+
+  .score-display{ text-align:right; }
+  .score-value{ font-family:'Fraunces', serif; font-size:1.25rem; font-weight:600; color: var(--brass); font-variant-numeric: tabular-nums; }
+  .score-label{ font-size:0.7rem; color: var(--ivory-dim); }
+
+  .game-panels{
+    display:flex;
+    flex:1;
+    gap:16px;
+    padding: 8px 16px 16px;
+    border-radius:16px;
+    transition: background-color .15s ease;
+  }
+  .game-panels.flash-good{ background: var(--good); }
+  .game-panels.flash-bad{ background: var(--bad); }
+  @media (max-width:700px){ .game-panels{ flex-direction:column; } }
+
+  .panel{
+    flex:1;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding: 16px;
+    gap: 14px;
+    min-height: 0;
+    transition: opacity .18s ease;
+  }
+  .panel.hidden-phase{ opacity:0; pointer-events:none; }
+
+  .panel-label{ font-size:0.76rem; color: var(--ivory-dim); text-transform:uppercase; letter-spacing:0.06em; }
+
+  .staff-box{ width:100%; flex:1; min-height:120px; display:flex; align-items:center; justify-content:center; }
+  .staff-box svg{ max-width:100%; height:auto; display:block; overflow: visible; }
+
+  #answer-staff-wrap{ cursor: crosshair; touch-action: none; }
+
+  .clef-buttons{ display:flex; gap:10px; }
+  .clef-btn{
+    font-family:'Inter', sans-serif; font-weight:600; font-size:0.92rem;
+    padding: 10px 18px; border-radius: 8px; cursor:pointer;
+    background: var(--ink-soft); color: var(--ivory); border: 1px solid var(--panel-line);
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .clef-btn.active{ background: var(--brass); color: var(--ink); border-color: var(--brass); }
+  .clef-btn:hover{ border-color: var(--brass-dim); }
+
+  .next-bar{ display:flex; justify-content:center; padding: 4px 16px 18px; }
+  .next-bar.hidden-phase{ display:none; }
+
+  /* ---------- Result screens ---------- */
+  .result-screen{ margin:auto; text-align:center; padding: 40px 20px; max-width: 480px; }
+  .result-screen h1{ font-size: 2.1rem; }
+  .result-screen p{ color: var(--ivory-dim); margin-top: 12px; font-size: 1.02rem; }
+  .result-actions{ margin-top: 28px; }
+  .timestamp{ margin-top: 24px; font-size: 0.76rem; color: var(--panel-line); }
+  .primary-btn{
+    font-family:'Inter', sans-serif; font-weight:600; font-size:0.95rem;
+    padding: 13px 26px; border-radius: 9px; cursor:pointer; border:none;
+    background: var(--brass); color: var(--ink);
+  }
+  .primary-btn:hover{ background:#DDB233; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <section id="screen-home" class="screen active">
+    <div class="home-header">
+      <h1>Match the Music</h1>
+      <p class="subtitle">A clef and note flash briefly. Pick the clef, then place the matching note on the empty staff.</p>
+    </div>
+    <div class="level-grid" id="level-grid"></div>
+  </section>
+
+  <!-- GAME -->
+  <section id="screen-game" class="screen">
+    <div class="game-topbar">
+      <button class="text-btn" id="quit-btn">&larr; Back to levels</button>
+      <div class="score-display"><span class="score-value" id="score-value">0 / 10</span><span class="score-label"> points</span></div>
+    </div>
+    <div class="game-panels" id="game-panels">
+      <div class="panel panel-prompt" id="panel-prompt">
+        <div class="panel-label">Memorize this</div>
+        <div class="staff-box" id="prompt-staff"></div>
+      </div>
+      <div class="panel panel-answer" id="panel-answer">
+        <div class="panel-label">Place your answer</div>
+        <div class="staff-box" id="answer-staff-wrap"><div id="answer-staff"></div></div>
+        <div class="clef-buttons">
+          <button class="clef-btn" id="btn-clef-treble" data-clef="treble">Treble clef</button>
+          <button class="clef-btn" id="btn-clef-bass" data-clef="bass">Bass clef</button>
+        </div>
+      </div>
+    </div>
+    <div class="next-bar hidden-phase" id="next-bar">
+      <button class="primary-btn" id="next-btn">Next</button>
+    </div>
+  </section>
+
+  <!-- SUCCESS -->
+  <section id="screen-success" class="screen">
+    <div class="result-screen">
+      <h1>Congratulations!</h1>
+      <p id="success-detail"></p>
+      <div class="result-actions">
+        <button class="primary-btn" id="success-home-btn">Back to levels</button>
+      </div>
+      <p id="success-timestamp" class="timestamp"></p>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var VF = Vex.Flow;
+
+  // ================= Note pools (bottom of staff to top, 5 lines + 4 spaces) =================
+  // Index order shared between clefs: 0 = bottom line, 8 = top line.
+  var SLOT_LINES  = [4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5, 0];
+  var TREBLE_NOTES = ['E4','F4','G4','A4','B4','C5','D5','E5','F5'];
+  var BASS_NOTES   = ['G2','A2','B2','C3','D3','E3','F3','G3','A3'];
+
+  var ONSCREEN_TIME = { 1: 1000, 2: 750, 3: 500 };
+
+  var STAFF_CFG = { width: 300, height: 150, staveX: 10, staveY: 35, staveWidth: 260, spacing: 10 };
+
+  function randInt(max){ return Math.floor(Math.random() * max); }
+
+  function slotNoteFor(clef, idx){
+    return clef === 'treble' ? TREBLE_NOTES[idx] : BASS_NOTES[idx];
+  }
+
+  function pickRandomPrompt(){
+    var clef = Math.random() < 0.5 ? 'treble' : 'bass';
+    var idx = randInt(9);
+    return { clef: clef, note: slotNoteFor(clef, idx) };
+  }
+
+  function toVexKey(noteName){
+    var m = noteName.match(/^([A-G]#?)(\d)$/);
+    return m[1].toLowerCase() + '/' + m[2];
+  }
+
+  // ================= Audio =================
+  var audioCtx = null;
+  function ensureAudio(){
+    if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+  }
+  document.addEventListener('click', function initAudioOnce(){
+    ensureAudio();
+    document.removeEventListener('click', initAudioOnce);
+  });
+
+  var SFX = {
+    correct: new Audio('correct.mp3'),
+    wrong: new Audio('wrong.mp3'),
+    applause: new Audio('applause.mp3')
+  };
+  function playSfx(name){
+    var base = SFX[name];
+    if(!base) return;
+    var el = base.cloneNode();
+    el.play().catch(function(){ /* ignore autoplay/missing-file errors */ });
+  }
+
+  // ================= Staff rendering =================
+  function renderStaffGeneric(container, clef, noteName, isGhost){
+    container.innerHTML = '';
+    var renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+    renderer.resize(STAFF_CFG.width, STAFF_CFG.height);
+    var context = renderer.getContext();
+    context.setFillStyle('#C9BFAF');
+    context.setStrokeStyle('#C9BFAF');
+
+    var stave = new VF.Stave(STAFF_CFG.staveX, STAFF_CFG.staveY, STAFF_CFG.staveWidth);
+    if(clef){ stave.addClef(clef); }
+    stave.setContext(context).draw();
+
+    if(clef && noteName){
+      var note = new VF.StaveNote({ clef: clef, keys: [toVexKey(noteName)], duration: 'q' });
+      var color = isGhost ? 'rgba(201,162,39,0.45)' : '#C9A227';
+      note.setStyle({ fillStyle: color, strokeStyle: color });
+      VF.Formatter.FormatAndDraw(context, stave, [note]);
+    }
+  }
+
+  function renderPromptStaff(clef, note){
+    renderStaffGeneric(document.getElementById('prompt-staff'), clef, note, false);
+  }
+  function clearPromptStaffDisplay(){
+    document.getElementById('prompt-staff').innerHTML = '';
+  }
+  function renderAnswerStaff(){
+    var noteName = (state.answerSlotIndex !== null && state.answerClef)
+      ? slotNoteFor(state.answerClef, state.answerSlotIndex) : null;
+    renderStaffGeneric(document.getElementById('answer-staff'), state.answerClef, noteName, !state.locked);
+  }
+  function clearAnswerStaffDisplay(){
+    document.getElementById('answer-staff').innerHTML = '';
+  }
+
+  // ================= Home screen =================
+  var LEVEL_DEFS = [
+    { level: 1, label: 'Level 1', sub: '1.0 second flash' },
+    { level: 2, label: 'Level 2', sub: '0.75 second flash' },
+    { level: 3, label: 'Level 3', sub: '0.5 second flash' }
+  ];
+
+  function buildHomeScreen(){
+    var grid = document.getElementById('level-grid');
+    grid.innerHTML = '';
+    LEVEL_DEFS.forEach(function(def){
+      var card = document.createElement('div');
+      card.className = 'level-card';
+      var name = document.createElement('div');
+      name.className = 'level-name';
+      name.textContent = def.label;
+      var sub = document.createElement('div');
+      sub.className = 'level-sub';
+      sub.textContent = def.sub;
+      card.appendChild(name);
+      card.appendChild(sub);
+      card.addEventListener('click', function(){ startLevel(def.level); });
+      grid.appendChild(card);
+    });
+  }
+
+  // ================= Game state =================
+  var state = {
+    level: 1,
+    score: 0,
+    promptClef: null,
+    promptNote: null,
+    answerClef: null,
+    answerSlotIndex: null,
+    locked: false,
+    reviewing: false,
+    promptTimer: null
+  };
+
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+  }
+
+  function updateScoreDisplay(){
+    document.getElementById('score-value').textContent = state.score + ' / 10';
+  }
+
+  function showPromptPanel(){ document.getElementById('panel-prompt').classList.remove('hidden-phase'); }
+  function hidePromptPanel(){ document.getElementById('panel-prompt').classList.add('hidden-phase'); }
+  function showAnswerPanel(){ document.getElementById('panel-answer').classList.remove('hidden-phase'); }
+  function hideAnswerPanel(){ document.getElementById('panel-answer').classList.add('hidden-phase'); }
+  function showNextButton(){ document.getElementById('next-bar').classList.remove('hidden-phase'); }
+  function hideNextButton(){ document.getElementById('next-bar').classList.add('hidden-phase'); }
+
+  function flashPanels(kind){
+    var el = document.getElementById('game-panels');
+    el.classList.remove('flash-good', 'flash-bad');
+    el.classList.add(kind === 'good' ? 'flash-good' : 'flash-bad');
+  }
+  function clearPanelFlash(){
+    document.getElementById('game-panels').classList.remove('flash-good', 'flash-bad');
+  }
+
+  function updateClefButtonStyles(){
+    document.getElementById('btn-clef-treble').classList.toggle('active', state.answerClef === 'treble');
+    document.getElementById('btn-clef-bass').classList.toggle('active', state.answerClef === 'bass');
+  }
+
+  function selectClef(clef){
+    if(state.locked || state.reviewing) return;
+    state.answerClef = clef;
+    updateClefButtonStyles();
+    renderAnswerStaff();
+  }
+
+  function startLevel(level){
+    ensureAudio();
+    state.level = level;
+    state.score = 0;
+    updateScoreDisplay();
+    clearPanelFlash();
+    hideNextButton();
+    showScreen('screen-game');
+    startRound();
+  }
+
+  function startRound(){
+    clearTimeout(state.promptTimer);
+    state.locked = false;
+    state.reviewing = false;
+    state.answerClef = null;
+    state.answerSlotIndex = null;
+    updateClefButtonStyles();
+
+    hideAnswerPanel();
+    clearAnswerStaffDisplay();
+    showPromptPanel();
+
+    var p = pickRandomPrompt();
+    state.promptClef = p.clef;
+    state.promptNote = p.note;
+    renderPromptStaff(p.clef, p.note);
+
+    state.promptTimer = setTimeout(function(){
+      hidePromptPanel();
+      clearPromptStaffDisplay();
+      showAnswerPanel();
+      renderAnswerStaff();
+    }, ONSCREEN_TIME[state.level]);
+  }
+
+  function handleCorrect(){
+    state.score = Math.min(10, state.score + 1);
+    updateScoreDisplay();
+    var won = state.score === 10;
+    flashPanels('good');
+    playSfx(won ? 'applause' : 'correct');
+    setTimeout(function(){
+      clearPanelFlash();
+      if(won){ endInSuccess(); } else { startRound(); }
+    }, 500);
+  }
+
+  function handleWrong(){
+    state.score = Math.max(0, state.score - 1);
+    updateScoreDisplay();
+    flashPanels('bad');
+    playSfx('wrong');
+    state.reviewing = true;
+    showPromptPanel();
+    renderPromptStaff(state.promptClef, state.promptNote);
+    showNextButton();
+  }
+
+  function onNextClicked(){
+    if(!state.reviewing) return;
+    clearPanelFlash();
+    hideNextButton();
+    hidePromptPanel();
+    clearPromptStaffDisplay();
+    state.reviewing = false;
+    startRound();
+  }
+
+  function commitAnswer(){
+    if(state.locked || state.reviewing) return;
+    if(!state.answerClef || state.answerSlotIndex === null) return;
+    state.locked = true;
+    renderAnswerStaff();
+    var placedNote = slotNoteFor(state.answerClef, state.answerSlotIndex);
+    var correct = (state.answerClef === state.promptClef) && (placedNote === state.promptNote);
+    if(correct){ handleCorrect(); } else { handleWrong(); }
+  }
+
+  function endInSuccess(){
+    clearTimeout(state.promptTimer);
+    var detail = document.getElementById('success-detail');
+    detail.textContent = 'You reached 10 points on level ' + state.level + '.';
+    var now = new Date();
+    document.getElementById('success-timestamp').textContent =
+      now.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' }) +
+      ' \u00b7 ' + now.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' });
+    showScreen('screen-success');
+  }
+
+  // ================= Answer staff interaction =================
+  function getAnswerLocalY(evt){
+    var svg = document.querySelector('#answer-staff svg');
+    if(!svg) return null;
+    var rect = svg.getBoundingClientRect();
+    if(!rect.width) return null;
+    var clientY;
+    if(evt.touches && evt.touches.length){ clientY = evt.touches[0].clientY; }
+    else if(evt.changedTouches && evt.changedTouches.length){ clientY = evt.changedTouches[0].clientY; }
+    else { clientY = evt.clientY; }
+    var scale = rect.width / STAFF_CFG.width;
+    return (clientY - rect.top) / scale;
+  }
+
+  function nearestSlotIndex(localY){
+    var best = 0, bestDist = Infinity;
+    SLOT_LINES.forEach(function(line, idx){
+      var y = STAFF_CFG.staveY + line * STAFF_CFG.spacing;
+      var dist = Math.abs(localY - y);
+      if(dist < bestDist){ bestDist = dist; best = idx; }
+    });
+    return best;
+  }
+
+  function updateGhostFromEvent(evt){
+    if(!state.answerClef || state.locked || state.reviewing) return;
+    var localY = getAnswerLocalY(evt);
+    if(localY === null) return;
+    var idx = nearestSlotIndex(localY);
+    if(idx !== state.answerSlotIndex){
+      state.answerSlotIndex = idx;
+      renderAnswerStaff();
+    }
+  }
+
+  function wireAnswerInteraction(){
+    var wrap = document.getElementById('answer-staff-wrap');
+    wrap.addEventListener('mousemove', updateGhostFromEvent);
+    wrap.addEventListener('click', function(evt){
+      updateGhostFromEvent(evt);
+      commitAnswer();
+    });
+    wrap.addEventListener('touchstart', function(evt){
+      evt.preventDefault();
+      updateGhostFromEvent(evt);
+    }, { passive: false });
+    wrap.addEventListener('touchmove', function(evt){
+      evt.preventDefault();
+      updateGhostFromEvent(evt);
+    }, { passive: false });
+    wrap.addEventListener('touchend', function(evt){
+      evt.preventDefault();
+      commitAnswer();
+    }, { passive: false });
+  }
+
+  // ================= Wiring =================
+  document.getElementById('quit-btn').addEventListener('click', function(){
+    clearTimeout(state.promptTimer);
+    showScreen('screen-home');
+  });
+  document.getElementById('success-home-btn').addEventListener('click', function(){ showScreen('screen-home'); });
+  document.getElementById('btn-clef-treble').addEventListener('click', function(){ selectClef('treble'); });
+  document.getElementById('btn-clef-bass').addEventListener('click', function(){ selectClef('bass'); });
+  document.getElementById('next-btn').addEventListener('click', onNextClicked);
+
+  wireAnswerInteraction();
+  buildHomeScreen();
+})();
+</script>
+</body>
+</html>
